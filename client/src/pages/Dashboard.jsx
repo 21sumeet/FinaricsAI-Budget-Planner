@@ -7,7 +7,9 @@ export default function Dashboard({ onSelectBudget }) {
   const [budgets, setBudgets] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
   const [isFormOpen, setIsFormOpen] = useState(false)
+  const [editingBudget, setEditingBudget] = useState(null)
 
   const fetchBudgets = async () => {
     try {
@@ -26,9 +28,33 @@ export default function Dashboard({ onSelectBudget }) {
     fetchBudgets()
   }, [])
 
-  const handleBudgetCreated = (newBudget) => {
-    // Immediate state update without full page refresh
-    setBudgets((prev) => [newBudget, ...prev])
+  const handleOpenCreateModal = () => {
+    setEditingBudget(null)
+    setIsFormOpen(true)
+  }
+
+  const handleOpenEditModal = (budget) => {
+    setEditingBudget(budget)
+    setIsFormOpen(true)
+  }
+
+  const handleBudgetSaved = (savedBudget, isEditMode) => {
+    if (isEditMode) {
+      setBudgets((prev) =>
+        prev.map((b) => (b.id === savedBudget.id ? { ...b, ...savedBudget } : b))
+      )
+    } else {
+      setBudgets((prev) => [savedBudget, ...prev])
+    }
+  }
+
+  const handleDeleteBudget = async (budgetId) => {
+    try {
+      await api.deleteBudget(budgetId)
+      setBudgets((prev) => prev.filter((b) => b.id !== budgetId))
+    } catch (err) {
+      alert(err.message || 'Failed to delete budget.')
+    }
   }
 
   // Summary statistics across all active budgets
@@ -57,7 +83,7 @@ export default function Dashboard({ onSelectBudget }) {
           </p>
         </div>
         <button
-          onClick={() => setIsFormOpen(true)}
+          onClick={handleOpenCreateModal}
           className="inline-flex items-center justify-center px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-sm transition-colors"
         >
           + Add New Budget
@@ -115,7 +141,7 @@ export default function Dashboard({ onSelectBudget }) {
             Get started by creating a category budget (e.g. Groceries or Rent) to track your monthly spending.
           </p>
           <button
-            onClick={() => setIsFormOpen(true)}
+            onClick={handleOpenCreateModal}
             className="px-4 py-2.5 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
           >
             + Create First Budget
@@ -124,16 +150,23 @@ export default function Dashboard({ onSelectBudget }) {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {budgets.map((b) => (
-            <BudgetCard key={b.id} budget={b} onSelect={onSelectBudget} />
+            <BudgetCard
+              key={b.id}
+              budget={b}
+              onSelect={onSelectBudget}
+              onEdit={handleOpenEditModal}
+              onDelete={handleDeleteBudget}
+            />
           ))}
         </div>
       )}
 
-      {/* Budget Form Modal */}
+      {/* Budget Form Modal (Create or Edit) */}
       <BudgetForm
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
-        onSuccess={handleBudgetCreated}
+        initialData={editingBudget}
+        onSuccess={handleBudgetSaved}
       />
     </div>
   )

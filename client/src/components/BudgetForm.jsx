@@ -1,8 +1,7 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { api } from '../api/client'
 
-export default function BudgetForm({ isOpen, onClose, onSuccess }) {
-  // Current month in YYYY-MM format
+export default function BudgetForm({ isOpen, onClose, onSuccess, initialData = null }) {
   const currentMonth = new Date().toISOString().slice(0, 7)
 
   const [category, setCategory] = useState('')
@@ -11,6 +10,20 @@ export default function BudgetForm({ isOpen, onClose, onSuccess }) {
 
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState(null)
+
+  const isEditMode = Boolean(initialData && initialData.id)
+
+  useEffect(() => {
+    if (initialData) {
+      setCategory(initialData.category || '')
+      setMonthlyLimit(initialData.monthly_limit || '')
+      setMonth(initialData.month || currentMonth)
+    } else {
+      setCategory('')
+      setMonthlyLimit('')
+      setMonth(currentMonth)
+    }
+  }, [initialData, isOpen])
 
   if (!isOpen) return null
 
@@ -36,21 +49,28 @@ export default function BudgetForm({ isOpen, onClose, onSuccess }) {
 
     try {
       setSubmitting(true)
-      const newBudget = await api.createBudget({
+      const payload = {
         category: category.trim(),
         monthly_limit: limitNum,
         month,
-      })
+      }
+
+      let result
+      if (isEditMode) {
+        result = await api.updateBudget(initialData.id, payload)
+      } else {
+        result = await api.createBudget(payload)
+      }
 
       // Reset form
       setCategory('')
       setMonthlyLimit('')
       setMonth(currentMonth)
 
-      onSuccess(newBudget)
+      onSuccess(result, isEditMode)
       onClose()
     } catch (err) {
-      setError(err.message || 'Failed to create budget.')
+      setError(err.message || `Failed to ${isEditMode ? 'update' : 'create'} budget.`)
     } finally {
       setSubmitting(false)
     }
@@ -60,7 +80,9 @@ export default function BudgetForm({ isOpen, onClose, onSuccess }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
       <div className="bg-white rounded-xl shadow-xl max-w-md w-full p-6 border border-gray-100">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-gray-900">Create New Budget</h2>
+          <h2 className="text-xl font-bold text-gray-900">
+            {isEditMode ? 'Edit Budget' : 'Create New Budget'}
+          </h2>
           <button
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 text-xl font-semibold leading-none"
@@ -132,7 +154,13 @@ export default function BudgetForm({ isOpen, onClose, onSuccess }) {
               disabled={submitting}
               className="px-4 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 rounded-lg transition-colors"
             >
-              {submitting ? 'Creating...' : 'Create Budget'}
+              {submitting
+                ? isEditMode
+                  ? 'Saving...'
+                  : 'Creating...'
+                : isEditMode
+                ? 'Save Changes'
+                : 'Create Budget'}
             </button>
           </div>
         </form>

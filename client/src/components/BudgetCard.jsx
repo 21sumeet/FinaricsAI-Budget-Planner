@@ -1,6 +1,6 @@
 import React from 'react'
 
-export default function BudgetCard({ budget, onSelect }) {
+export default function BudgetCard({ budget, onSelect, onEdit, onDelete }) {
   const { id, category, monthly_limit, spent, remaining, month } = budget
 
   const limitNum = Number(monthly_limit) || 0
@@ -18,18 +18,52 @@ export default function BudgetCard({ budget, onSelect }) {
     }).format(val)
   }
 
+  const handleDelete = (e) => {
+    e.stopPropagation()
+    const confirmMessage = `Are you sure you want to delete the budget "${category}"?\n\n⚠️ Warning: Deleting this budget will automatically remove all associated expenses!`
+    if (window.confirm(confirmMessage)) {
+      onDelete && onDelete(id)
+    }
+  }
+
+  const handleEdit = (e) => {
+    e.stopPropagation()
+    onEdit && onEdit(budget)
+  }
+
   return (
     <div
       onClick={() => onSelect && onSelect(id)}
-      className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow cursor-pointer overflow-hidden p-6 flex flex-col justify-between"
+      className="bg-white rounded-xl shadow-xs border border-gray-100 hover:shadow-md transition-all cursor-pointer overflow-hidden p-6 flex flex-col justify-between group"
     >
       <div>
-        {/* Header: Category & Month Badge */}
-        <div className="flex items-center justify-between mb-3">
-          <h3 className="text-xl font-bold text-gray-900 truncate">{category}</h3>
-          <span className="px-2.5 py-1 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-100">
-            {month}
-          </span>
+        {/* Header: Category, Month Badge, and Action Buttons */}
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div>
+            <h3 className="text-xl font-bold text-gray-900 group-hover:text-blue-600 transition-colors">
+              {category}
+            </h3>
+            <span className="inline-block mt-1 px-2.5 py-0.5 text-xs font-medium rounded-full bg-blue-50 text-blue-700 border border-blue-100">
+              {month}
+            </span>
+          </div>
+
+          <div className="flex items-center space-x-1 opacity-90 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+            <button
+              onClick={handleEdit}
+              title="Edit Budget"
+              className="p-1.5 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors text-xs font-medium"
+            >
+              ✏️
+            </button>
+            <button
+              onClick={handleDelete}
+              title="Delete Budget"
+              className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-md transition-colors text-xs font-medium"
+            >
+              🗑️
+            </button>
+          </div>
         </div>
 
         {/* Amounts Overview */}
@@ -73,7 +107,7 @@ export default function BudgetCard({ budget, onSelect }) {
 
       {/* View Details Action */}
       <div className="mt-5 pt-3 border-t border-gray-50 flex items-center justify-between text-xs text-blue-600 font-medium">
-        <span>View Details & Expenses</span>
+        <span>View Expenses Log</span>
         <span>→</span>
       </div>
     </div>

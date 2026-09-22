@@ -2,11 +2,13 @@ import React, { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import ExpenseForm from '../components/ExpenseForm'
 import ExpenseList from '../components/ExpenseList'
+import BudgetForm from '../components/BudgetForm'
 
 export default function BudgetDetail({ budgetId, onBack }) {
   const [budget, setBudget] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  const [isEditBudgetOpen, setIsEditBudgetOpen] = useState(false)
 
   const fetchBudgetDetail = async () => {
     try {
@@ -27,6 +29,30 @@ export default function BudgetDetail({ budgetId, onBack }) {
     }
   }, [budgetId])
 
+  // Budget Update handler
+  const handleBudgetUpdated = (updatedBudget) => {
+    setBudget((prev) => ({
+      ...prev,
+      ...updatedBudget,
+      // Recalculate remaining based on existing spent
+      remaining: updatedBudget.monthly_limit - (prev ? prev.spent : 0),
+    }))
+  }
+
+  // Budget Delete handler with cascading warning
+  const handleDeleteBudget = async () => {
+    if (!budget) return
+    const confirmMessage = `Are you sure you want to delete the budget "${budget.category}"?\n\n⚠️ Warning: Deleting this budget will automatically remove all associated expenses!`
+    if (window.confirm(confirmMessage)) {
+      try {
+        await api.deleteBudget(budget.id)
+        onBack()
+      } catch (err) {
+        alert(err.message || 'Failed to delete budget.')
+      }
+    }
+  }
+
   // Instant State Update when a new expense is logged
   const handleExpenseAdded = (newExpense) => {
     setBudget((prev) => {
@@ -42,6 +68,29 @@ export default function BudgetDetail({ budgetId, onBack }) {
         expenses: updatedExpenses,
       }
     })
+  }
+
+  // Instant State Update when an expense is updated
+  const handleExpenseUpdated = async (expenseId, payload) => {
+    try {
+      const updatedExp = await api.updateExpense(expenseId, payload)
+
+      setBudget((prev) => {
+        if (!prev) return prev
+        const updatedExpenses = prev.expenses.map((e) => (e.id === expenseId ? updatedExp : e))
+        const newSpent = updatedExpenses.reduce((acc, curr) => acc + Number(curr.amount), 0)
+        const newRemaining = prev.monthly_limit - newSpent
+
+        return {
+          ...prev,
+          spent: newSpent,
+          remaining: newRemaining,
+          expenses: updatedExpenses,
+        }
+      })
+    } catch (err) {
+      alert(err.message || 'Failed to update expense.')
+    }
   }
 
   // Instant State Update when an expense is deleted
@@ -123,13 +172,30 @@ export default function BudgetDetail({ budgetId, onBack }) {
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
       {/* Navigation Header */}
-      <button
-        onClick={onBack}
-        className="text-sm font-semibold text-blue-600 hover:text-blue-800 mb-6 inline-flex items-center space-x-1"
-      >
-        <span>←</span>
-        <span>Back to Dashboard</span>
-      </button>
+      <div className="flex items-center justify-between mb-6">
+        <button
+          onClick={onBack}
+          className="text-sm font-semibold text-blue-600 hover:text-blue-800 inline-flex items-center space-x-1"
+        >
+          <span>←</span>
+          <span>Back to Dashboard</span>
+        </button>
+
+        <div className="flex items-center space-x-2">
+          <button
+            onClick={() => setIsEditBudgetOpen(true)}
+            className="px-3 py-1.5 text-xs font-semibold text-gray-700 bg-white border border-gray-200 hover:bg-gray-50 rounded-lg transition-colors"
+          >
+            ✏️ Edit Budget
+          </button>
+          <button
+            onClick={handleDeleteBudget}
+            className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors"
+          >
+            🗑️ Delete Budget
+          </button>
+        </div>
+      </div>
 
       {/* Main Budget Card Summary */}
       <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-6 mb-8">
@@ -202,7 +268,19 @@ export default function BudgetDetail({ budgetId, onBack }) {
       <ExpenseForm budgetId={budget.id} onSuccess={handleExpenseAdded} />
 
       {/* Expense List */}
-      <ExpenseList expenses={budget.expenses} onDeleteExpense={handleExpenseDeleted} />
+      <ExpenseList
+        expenses={budget.expenses}
+        onDeleteExpense={handleExpenseDeleted}
+        onUpdateExpense={handleExpenseUpdated}
+      />
+
+      {/* Budget Edit Modal */}
+      <BudgetForm
+        isOpen={isEditBudgetOpen}
+        onClose={() => setIsEditBudgetOpen(false)}
+        initialData={budget}
+        onSuccess={handleBudgetUpdated}
+      />
     </div>
   )
 }
