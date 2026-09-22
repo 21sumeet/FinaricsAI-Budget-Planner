@@ -1,5 +1,6 @@
 import React, { useState } from 'react'
 import Dashboard from './pages/Dashboard'
+import BudgetDetail from './pages/BudgetDetail'
 
 function App() {
   const [currentView, setCurrentView] = useState('dashboard')
@@ -40,27 +41,12 @@ function App() {
         </div>
       </header>
 
-      {/* Main Page View */}
+      {/* Main View Router */}
       <main className="flex-1">
         {currentView === 'dashboard' ? (
           <Dashboard onSelectBudget={handleSelectBudget} />
         ) : (
-          <div className="max-w-6xl mx-auto px-4 py-8">
-            <button
-              onClick={handleNavigateHome}
-              className="text-sm text-blue-600 hover:underline mb-4 inline-block font-medium"
-            >
-              ← Back to Dashboard
-            </button>
-            <div className="bg-white rounded-xl shadow-xs border border-gray-100 p-8 text-center">
-              <h2 className="text-xl font-bold text-gray-800 mb-2">
-                Budget Detail View (Selected ID: {selectedBudgetId})
-              </h2>
-              <p className="text-sm text-gray-500">
-                Phase 4: Expense list & expense logger will be integrated here.
-              </p>
-            </div>
-          </div>
+          <BudgetDetail budgetId={selectedBudgetId} onBack={handleNavigateHome} />
         )}
       </main>
 
