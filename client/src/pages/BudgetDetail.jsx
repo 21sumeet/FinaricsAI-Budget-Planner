@@ -3,12 +3,22 @@ import { api } from '../api/client'
 import ExpenseForm from '../components/ExpenseForm'
 import ExpenseList from '../components/ExpenseList'
 import BudgetForm from '../components/BudgetForm'
+import ConfirmModal from '../components/ConfirmModal'
 
 export default function BudgetDetail({ budgetId, onBack }) {
   const [budget, setBudget] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+
   const [isEditBudgetOpen, setIsEditBudgetOpen] = useState(false)
+
+  // Custom Modal state for budget deletion
+  const [isDeleteBudgetOpen, setIsDeleteBudgetOpen] = useState(false)
+  const [isDeletingBudget, setIsDeletingBudget] = useState(false)
+
+  // Custom Modal state for expense deletion
+  const [deletingExpense, setDeletingExpense] = useState(null)
+  const [isDeletingExpense, setIsDeletingExpense] = useState(false)
 
   const fetchBudgetDetail = async () => {
     try {
@@ -34,22 +44,22 @@ export default function BudgetDetail({ budgetId, onBack }) {
     setBudget((prev) => ({
       ...prev,
       ...updatedBudget,
-      // Recalculate remaining based on existing spent
       remaining: updatedBudget.monthly_limit - (prev ? prev.spent : 0),
     }))
   }
 
-  // Budget Delete handler with cascading warning
-  const handleDeleteBudget = async () => {
+  // Budget Delete confirmation handler
+  const handleConfirmDeleteBudget = async () => {
     if (!budget) return
-    const confirmMessage = `Are you sure you want to delete the budget "${budget.category}"?\n\n⚠️ Warning: Deleting this budget will automatically remove all associated expenses!`
-    if (window.confirm(confirmMessage)) {
-      try {
-        await api.deleteBudget(budget.id)
-        onBack()
-      } catch (err) {
-        alert(err.message || 'Failed to delete budget.')
-      }
+    try {
+      setIsDeletingBudget(true)
+      await api.deleteBudget(budget.id)
+      setIsDeleteBudgetOpen(false)
+      onBack()
+    } catch (err) {
+      alert(err.message || 'Failed to delete budget.')
+    } finally {
+      setIsDeletingBudget(false)
     }
   }
 
@@ -93,23 +103,26 @@ export default function BudgetDetail({ budgetId, onBack }) {
     }
   }
 
-  // Instant State Update when an expense is deleted
-  const handleExpenseDeleted = async (expenseId) => {
-    if (!window.confirm('Are you sure you want to delete this expense?')) {
-      return
+  // Expense Delete confirmation modal triggers
+  const handlePromptDeleteExpense = (expenseId) => {
+    const targetExp = budget?.expenses?.find((e) => e.id === expenseId)
+    if (targetExp) {
+      setDeletingExpense(targetExp)
     }
+  }
 
+  const handleConfirmDeleteExpense = async () => {
+    if (!deletingExpense) return
     try {
-      await api.deleteExpense(expenseId)
+      setIsDeletingExpense(true)
+      await api.deleteExpense(deletingExpense.id)
 
       setBudget((prev) => {
         if (!prev) return prev
-        const targetExp = prev.expenses.find((e) => e.id === expenseId)
-        const deletedAmount = targetExp ? Number(targetExp.amount) : 0
-
+        const deletedAmount = Number(deletingExpense.amount)
         const newSpent = prev.spent - deletedAmount
         const newRemaining = prev.monthly_limit - newSpent
-        const updatedExpenses = prev.expenses.filter((e) => e.id !== expenseId)
+        const updatedExpenses = prev.expenses.filter((e) => e.id !== deletingExpense.id)
 
         return {
           ...prev,
@@ -118,8 +131,12 @@ export default function BudgetDetail({ budgetId, onBack }) {
           expenses: updatedExpenses,
         }
       })
+
+      setDeletingExpense(null)
     } catch (err) {
       alert(err.message || 'Failed to delete expense.')
+    } finally {
+      setIsDeletingExpense(false)
     }
   }
 
@@ -189,7 +206,7 @@ export default function BudgetDetail({ budgetId, onBack }) {
             ✏️ Edit Budget
           </button>
           <button
-            onClick={handleDeleteBudget}
+            onClick={() => setIsDeleteBudgetOpen(true)}
             className="px-3 py-1.5 text-xs font-semibold text-red-600 bg-red-50 border border-red-100 hover:bg-red-100 rounded-lg transition-colors"
           >
             🗑️ Delete Budget
@@ -270,7 +287,7 @@ export default function BudgetDetail({ budgetId, onBack }) {
       {/* Expense List */}
       <ExpenseList
         expenses={budget.expenses}
-        onDeleteExpense={handleExpenseDeleted}
+        onDeleteExpense={handlePromptDeleteExpense}
         onUpdateExpense={handleExpenseUpdated}
       />
 
@@ -280,6 +297,31 @@ export default function BudgetDetail({ budgetId, onBack }) {
         onClose={() => setIsEditBudgetOpen(false)}
         initialData={budget}
         onSuccess={handleBudgetUpdated}
+      />
+
+      {/* Custom Budget Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={isDeleteBudgetOpen}
+        onClose={() => setIsDeleteBudgetOpen(false)}
+        onConfirm={handleConfirmDeleteBudget}
+        loading={isDeletingBudget}
+        title={`Delete Budget "${budget.category}"?`}
+        message="Are you sure you want to delete this budget category?"
+        warning="⚠️ Warning: Deleting this budget will automatically delete all associated expense records!"
+        confirmText="Yes, Delete Budget"
+      />
+
+      {/* Custom Expense Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deletingExpense)}
+        onClose={() => setDeletingExpense(null)}
+        onConfirm={handleConfirmDeleteExpense}
+        loading={isDeletingExpense}
+        title="Delete Expense?"
+        message={`Are you sure you want to delete this expense of ${
+          deletingExpense ? formatCurrency(deletingExpense.amount) : ''
+        }${deletingExpense?.description ? ` ("${deletingExpense.description}")` : ''}?`}
+        confirmText="Yes, Delete Expense"
       />
     </div>
   )

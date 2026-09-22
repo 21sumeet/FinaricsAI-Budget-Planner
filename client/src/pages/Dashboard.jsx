@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { api } from '../api/client'
 import BudgetCard from '../components/BudgetCard'
 import BudgetForm from '../components/BudgetForm'
+import ConfirmModal from '../components/ConfirmModal'
 
 export default function Dashboard({ onSelectBudget }) {
   const [budgets, setBudgets] = useState([])
@@ -10,6 +11,10 @@ export default function Dashboard({ onSelectBudget }) {
 
   const [isFormOpen, setIsFormOpen] = useState(false)
   const [editingBudget, setEditingBudget] = useState(null)
+
+  // Custom Delete Confirmation Modal state
+  const [deletingBudget, setDeletingBudget] = useState(null)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   const fetchBudgets = async () => {
     try {
@@ -48,12 +53,22 @@ export default function Dashboard({ onSelectBudget }) {
     }
   }
 
-  const handleDeleteBudget = async (budgetId) => {
+  // Trigger custom delete confirmation modal
+  const handlePromptDeleteBudget = (budget) => {
+    setDeletingBudget(budget)
+  }
+
+  const handleConfirmDeleteBudget = async () => {
+    if (!deletingBudget) return
     try {
-      await api.deleteBudget(budgetId)
-      setBudgets((prev) => prev.filter((b) => b.id !== budgetId))
+      setIsDeleting(true)
+      await api.deleteBudget(deletingBudget.id)
+      setBudgets((prev) => prev.filter((b) => b.id !== deletingBudget.id))
+      setDeletingBudget(null)
     } catch (err) {
       alert(err.message || 'Failed to delete budget.')
+    } finally {
+      setIsDeleting(false)
     }
   }
 
@@ -155,7 +170,7 @@ export default function Dashboard({ onSelectBudget }) {
               budget={b}
               onSelect={onSelectBudget}
               onEdit={handleOpenEditModal}
-              onDelete={handleDeleteBudget}
+              onDelete={handlePromptDeleteBudget}
             />
           ))}
         </div>
@@ -167,6 +182,18 @@ export default function Dashboard({ onSelectBudget }) {
         onClose={() => setIsFormOpen(false)}
         initialData={editingBudget}
         onSuccess={handleBudgetSaved}
+      />
+
+      {/* Custom Budget Delete Confirmation Modal */}
+      <ConfirmModal
+        isOpen={Boolean(deletingBudget)}
+        onClose={() => setDeletingBudget(null)}
+        onConfirm={handleConfirmDeleteBudget}
+        loading={isDeleting}
+        title={`Delete Budget "${deletingBudget?.category}"?`}
+        message="Are you sure you want to delete this budget category?"
+        warning="⚠️ Warning: Deleting this budget will automatically delete all associated expense records!"
+        confirmText="Yes, Delete Budget"
       />
     </div>
   )

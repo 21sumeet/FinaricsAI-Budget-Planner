@@ -20,10 +20,7 @@ export default function BudgetCard({ budget, onSelect, onEdit, onDelete }) {
 
   const handleDelete = (e) => {
     e.stopPropagation()
-    const confirmMessage = `Are you sure you want to delete the budget "${category}"?\n\n⚠️ Warning: Deleting this budget will automatically remove all associated expenses!`
-    if (window.confirm(confirmMessage)) {
-      onDelete && onDelete(id)
-    }
+    onDelete && onDelete(budget)
   }
 
   const handleEdit = (e) => {
